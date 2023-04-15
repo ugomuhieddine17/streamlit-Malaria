@@ -10,7 +10,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import altair as alt
 from altair import expr, datum
-from vega_datasets import data
 import geopandas as gpd
 from shapely import wkt
 import folium
