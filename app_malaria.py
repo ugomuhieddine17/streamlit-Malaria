@@ -10,7 +10,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import altair as alt
 from altair import expr, datum
-from vega_datasets import data
 import geopandas as gpd
 from shapely import wkt
 import folium
@@ -141,10 +140,13 @@ def bar_chart(df_, country):
         color = alt.condition(
             alt.datum["Country Name"] == country,
             alt.value('orange'),     # which sets the bar orange.
-            alt.value('#01b8aa')
-    ))
+            alt.value('#01b8aa'))
+        )
 
-    chart = alt.vconcat(chart1, chart2, spacing=0)
+    chart = alt.vconcat(chart1, chart2, spacing=0).properties(
+        title="Incidence rates per 1000 population vs GDP per capita in {} and neighbors countries".format(country)
+    )
+
     return chart
 
 def chart_time_serie(all_diff_df, params_to_plot, country):
@@ -191,50 +193,6 @@ def chart_time_serie(all_diff_df, params_to_plot, country):
 
     return combined_chart
 
-def map_temperature(gdf, year):
-    geojson = gdf[gdf.Year == year].to_json()
-    df_display= alt.InlineData(geojson,  format=alt.DataFormat(property='features',type='json'))
-    map_temp = alt.Chart(df_display).mark_geoshape().encode(
-            color=alt.Color('properties.AverageTemperature:Q',scale = alt.Scale(scheme="orangered")),
-            tooltip=['properties.Country:N', 'properties.Year:O', 'properties.AverageTemperature:Q']
-            ).properties(
-                width=600,
-                height=400
-            ).project(
-                type='mercator'
-            ).encode(
-                tooltip=[
-                    alt.Tooltip('properties.Country:N', title='Country'),
-                    alt.Tooltip('properties.Year:O', title='Year'),
-                    alt.Tooltip('properties.AverageTemperature:Q', title='Average Temperature', format='.1f')
-                ]
-            )
-    map_temp.save('chart.html')
-    HtmlFile = open('chart.html', 'r', encoding='utf-8')
-    # Load HTML file in HTML component for display on Streamlit page
-    raw_html = HtmlFile.read().encode("utf-8")
-    #raw_html = base64.b64encode(raw_html).decode()
-    components.iframe(f"data:text/html;base64,{raw_html}", height=510)#, width=700)
-    
-def map_precipitation(gdf, year):
-    geojson = gdf[gdf.Year == year].to_json()
-    df_display= alt.InlineData(geojson,  format=alt.DataFormat(property='features',type='json'))
-    map_pre = alt.Chart(df_display).mark_geoshape().encode(
-            color=alt.Color('properties.Precipitation (mm/year):Q',scale = alt.Scale(scheme ="purpleblue")),
-            tooltip=['properties.Country:N', 'properties.Year:O', 'properties.Precipitation (mm/year):Q']
-            ).properties(
-                width=600,
-                height=400
-            ).project(
-                type='mercator'
-            ).encode(
-                tooltip=[
-                    alt.Tooltip('properties.Country:N', title='Country'),
-                    alt.Tooltip('properties.Year:O', title='Year'),
-                    alt.Tooltip('properties.Precipitation (mm/year):Q', title='Precipitation (mm/year)', format='.1f')
-                ]
-            )
-    return map_pre
 
 def display_map(gdf,df, year, type, display_incidence_rates=True):
     if type=="Temperature":
@@ -242,11 +200,13 @@ def display_map(gdf,df, year, type, display_incidence_rates=True):
         data_display_name = "Average Temperature"
         data_unit = "°C"
         fill_color = "YlOrRd"
+        loc = "Average Temperature in °C"
     else:
         data_name = "Precipitation (mm/year)"
         data_display_name = "Precipitation"
         data_unit = "mm/year"
         fill_color = "Blues"
+        loc = "Precipitation in mm/year"
     
     gdf_year = gdf[gdf.Year==year]
     df_year = df[df.Year == year]
@@ -267,7 +227,7 @@ def display_map(gdf,df, year, type, display_incidence_rates=True):
                                     highlight=True
                                     )
     
-    choropleth.geojson.add_to(m)
+    choropleth.add_to(m)
     
     for feature in choropleth.geojson.data["features"]:
         df1 = gdf.set_index("Country")
@@ -299,7 +259,15 @@ def display_map(gdf,df, year, type, display_incidence_rates=True):
         folium.features.GeoJsonTooltip(["Country",data_display_name, "Incidence rate"], labels=False)
     )
     selected_country = ''
-    st_map = st_folium(m)
+    title_html = '''
+                <h3 align="center" style="font-size:16px"><b>{}</b></h3>
+                '''.format(loc)   
+
+    m.get_root().html.add_child(folium.Element(title_html))
+    
+    
+    
+    st_map = st_folium(m, width=600)
     if st_map["last_active_drawing"]:
         selected_country = st_map["last_active_drawing"]["properties"]["Country"]
 
@@ -337,8 +305,10 @@ else:
     selected_country = st.session_state.prec_selec
 
 with col1:
+    col1.markdown("<h3 style='text-align: center;'>Average Temperature in °C</h3>", unsafe_allow_html=True)
     selected_country_temp = display_map(gdf, df, year, "Temperature")
 with col2:
+    col2.markdown("<h3 style='text-align: center;'>Precipitation in mm/year</h3>", unsafe_allow_html=True)
     selected_country_precip = display_map(gdf, df, year, "Precipitation")
 
 if st.session_state.prec_selec != selected_country_temp:
