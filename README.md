@@ -1,5 +1,6 @@
 # streamlit-Malaria
 
 
-https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app
+The web application : https://malaria-in-africa.streamlit.app
+
 
